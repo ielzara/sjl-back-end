@@ -2,9 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.system.endpoints.health import router as system_router
 # from app.api.v1.router import api_router
-# We'll uncomment these once we create these files
-# from app.core.config import Settings
-# from app.core.database import engine
+from app.core.config import Settings
+from app.core.database import engine
 
 app = FastAPI(
     title="Social Justice Library API",
