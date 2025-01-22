@@ -67,3 +67,6 @@ class CRUDBook(CRUDBase[Book, BookCreate, BookUpdate]):
         result = await db.execute(query)
         return result.scalars().all()
 
+
+# Create CRUD instance
+book = CRUDBook(Book)
