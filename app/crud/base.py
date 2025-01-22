@@ -34,7 +34,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         result = await db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_multi(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> List[ModelType]:
+    async def get_multi_paginated(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> Tuple[List[ModelType], int, bool]:
         '''
         get multiple records with pagination
         **Parameters**
@@ -42,11 +42,22 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         * `skip`: number of records to skip
         * `limit`: number of records to return
         **Returns**
-        * list of record instances
+        * Tuple of (list of records, total count and has_more flag)
         '''
-        query = select(self.model).offset(skip).limit(limit)
+
+        # Get total count
+        count_query = select(func.count()).select_from(self.model)
+        total = await db.scalar(count_query)
+
+        # Get one extra item to check if there are more records
+        query = select(self.model).offset(skip).limit(limit + 1)
         result = await dv.execute(query)
-        return result.scarars().all()
+        items = result.scalars().all()
+
+        # Check if there are more records
+        has_more = len(items) > limit
+        items = items[:limit]
+        return items, total, has_more
 
     async def create(self, db: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
         '''

@@ -36,7 +36,7 @@ class CRUDArticle(CRUDBase[Article, ArticleCreate, ArticleUpdate]):
         result = await db.execute(query)
         return result.scalars().all()
 
-    async def get_by_topic(self, db: AsyncSession, *, topic_id: int, skip: int = 0, limit: int = 10) -> List[Article]:
+    async def get_by_topic(self, db: AsyncSession, *, topic_id: int, skip: int = 0, limit: int = 10) -> Tuple[List[Article], int, bool]:
         '''
         get articles by topic with pagination
         **Parameters**
@@ -45,11 +45,11 @@ class CRUDArticle(CRUDBase[Article, ArticleCreate, ArticleUpdate]):
         * `skip`: number of articles to skip
         * `limit`: number of articles to return
         **Returns**
-        * list of article instances
+        * (articles, total count, has_more flag)
         '''
 
-        query = select(self.model).join(self.model.topics).filter(Topic.id == topic_id).offset(skip).limit(limit)
-        result = await db.execute(query)
+        filter_query = select(self.model).join(self.model.topics).filter(Topic.id == topic_id)
+        result = await self.get_milti_paginated(db. skip=skip, limit=limit, filter_query=filter_query)
         return result.scalars().all()
 
     async def search(self, db: AsyncSession, *, keyword: str, skip: int = 0, limit: int = 10) -> List[Article]:
