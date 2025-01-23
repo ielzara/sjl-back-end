@@ -2,6 +2,7 @@ from typing import Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 
 from app.crud.article import article_crud
 from app.schemas.article import ArticleCreate, ArticleUpdate, ArticleDB
@@ -91,8 +92,21 @@ async def create_article(article_in: ArticleCreate, db: AsyncSession = Depends(g
     **Returns**
     * article instance
     '''
-    article = await article_crud.create(db, obj_in=article_in)
-    return article
+    try:
+        data = article_in.model_dump()
+        if isinstance(data['date'], str):
+            data['date'] = date.fromisoformat(data['date'])
+        
+        article = await article_crud.create(db, obj_in=data)
+        print("Created article:", article.__dict__)  # Debug print
+        
+        if article is None:
+            raise HTTPException(status_code=500, detail="Failed to create article")
+        
+        return article
+    except Exception as e:
+        print("Error:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{article_id}", response_model=ArticleDB)
 async def update_article(article_id: int, article_in: ArticleUpdate, db: AsyncSession = Depends(get_db)) -> ArticleDB:

@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # Database configuration
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/sjl_db"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sjl_db"
 
     @validator("DATABASE_URL")
     def validate_database_url(cls, v: str) -> str:

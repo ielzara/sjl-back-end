@@ -15,11 +15,9 @@ class BaseSchema(BaseModel):
 
 class BaseDBSchema(BaseSchema):
     '''
-    Base schema for databes models with ID and timpestamps
+    Base schema for database models with ID and timestamps
     ''' 
     id: int
-    created_at: datetime
-    uodated_at: Optional[datetime] = None
 
 class BaseCreateSchema(BaseSchema):
     '''

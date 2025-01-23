@@ -1,5 +1,5 @@
-from datetime import datetime
-from sqlalchemy import DateTime
+from datetime import date
+from sqlalchemy import Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List
 from app.core.database import Base
@@ -9,7 +9,7 @@ class Article(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title: Mapped[str]
-    date: Mapped[datetime] = mapped_column(DateTime(timezone=False))
+    date: Mapped[date] = mapped_column(Date)
     content: Mapped[str]
     source: Mapped[str]
     url: Mapped[str] = mapped_column(unique=True)

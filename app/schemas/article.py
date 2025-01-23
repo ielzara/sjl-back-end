@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date
 from typing import Optional, List
-from pydantic import HttpUrl
+from pydantic import HttpUrl, field_validator
 
 from app.schemas.base import BaseSchema, BaseDBSchema
 
@@ -13,8 +13,13 @@ class ArticleBase(BaseSchema):
     source: str
     url: HttpUrl
     featured: bool = False
-    date: datetime
+    date: date
     
+    @field_validator('date', mode='before')
+    def validate_date(cls, v):
+        if isinstance(v, str):
+            return date.fromisoformat(v)
+        return v
 
 class ArticleCreate(ArticleBase):
     '''
@@ -31,7 +36,7 @@ class ArticleUpdate(ArticleBase):
     source: Optional[str] = None
     url: Optional[HttpUrl] = None
     featured: Optional[bool] = None
-    date: Optional[datetime] = None
+    date: Optional[date] = None 
 
 class ArticleDB(ArticleBase, BaseDBSchema):
     '''

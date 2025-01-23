@@ -1,32 +1,28 @@
+from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker, mapped_column, Mapped
+from sqlalchemy import DateTime
 from .config import settings
 
 print(f"Connecting to database with URL: {settings.DATABASE_URL}")
 
-# Convert database URL to async format
-# postgresql:// -> postgresql+asyncpg://
-async_database_url = settings.DATABASE_URL.replace(
-    "postgresql://", "postgresql+asyncpg://"
-)
-
-# Create async database engine
+class Base(DeclarativeBase):
+    """Base class for all database models"""
+    pass
+# Create database engine
 engine = create_async_engine(
-    async_database_url,
-    pool_pre_ping=True,  # Enable automatic reconnection
-    echo=True,  # Log SQL queries (useful for development)
+    settings.DATABASE_URL,
+    pool_pre_ping=True  # Enable automatic reconnection
 )
 
-# Create async session factory
+# Create AsyncSessionLocal class
 AsyncSessionLocal = sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
 )
-
-# Create Base class for models
-Base = declarative_base()
 
 # Dependency to get DB session
 async def get_db() -> AsyncSession:
