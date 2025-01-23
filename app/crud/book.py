@@ -1,9 +1,10 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.crud.base import CRUDBase
 from app.models.book import Book
+from app.models.topic import Topic
 from app.schemas.book import BookCreate, BookUpdate
 
 class CRUDBook(CRUDBase[Book, BookCreate, BookUpdate]):
@@ -20,7 +21,14 @@ class CRUDBook(CRUDBase[Book, BookCreate, BookUpdate]):
         result = await db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_by_author(self, db: AsyncSession, *, author: str, skip: int = 0, limit: int = 10) -> List[Book]:
+    async def get_by_author(
+        self, 
+        db: AsyncSession, 
+        *, 
+        author: str, 
+        skip: int = 0, 
+        limit: int = 10
+    ) -> Tuple[List[Book], int, bool]:
         '''
         get books by author with pagination
         **Parameters**
@@ -29,13 +37,19 @@ class CRUDBook(CRUDBase[Book, BookCreate, BookUpdate]):
         * `skip`: number of books to skip
         * `limit`: number of books to return
         **Returns**
-        * list of book instances
+        * (list of book instances, total count, has_more flag)
         '''
-        query = select(self.model).filter(self.model.author.ilike(f"%{author}%")).offset(skip).limit(limit)
-        result = await db.execute(query)
-        return result.scalars().all()
+        filter_query = select(self.model).filter(self.model.author.ilike(f"%{author}%"))
+        return await self.get_multi_paginated(db, skip=skip, limit=limit, filter_query=filter_query)
 
-    async def get_by_topic(self, db: AsyncSession, *, topic_id: int, skip: int = 0, limit: int = 10) -> List[Book]:
+    async def get_by_topic(
+        self, 
+        db: AsyncSession, 
+        *, 
+        topic_id: int, 
+        skip: int = 0, 
+        limit: int = 10
+    ) -> Tuple[List[Book], int, bool]:
         '''
         get books by topic with pagination
         **Parameters**
@@ -44,13 +58,19 @@ class CRUDBook(CRUDBase[Book, BookCreate, BookUpdate]):
         * `skip`: number of books to skip
         * `limit`: number of books to return
         **Returns**
-        * list of book instances
+        * (list of book instances, total count, has_more flag)
         '''
-        query = select(self.model).join(self.model.topics).filter(Topic.id == topic_id).offset(skip).limit(limit)
-        result = await db.execute(query)
-        return result.scalars().all()
+        filter_query = select(self.model).join(self.model.topics).filter(Topic.id == topic_id)
+        return await self.get_multi_paginated(db, skip=skip, limit=limit, filter_query=filter_query)
     
-    async def search(self, db: AsyncSession, *, keyword: str, skip: int = 0, limit: int = 10) -> List[Book]:
+    async def search(
+        self, 
+        db: AsyncSession, 
+        *, 
+        keyword: str, 
+        skip: int = 0, 
+        limit: int = 10
+    ) -> Tuple[List[Book], int, bool]:
         '''
         search book by keyword in title or description
         **Parameters**
@@ -59,14 +79,14 @@ class CRUDBook(CRUDBase[Book, BookCreate, BookUpdate]):
         * `skip`: number of books to skip
         * `limit`: number of books to return
         **Returns**
-        * list of book instances
+        * (list of book instances, total count, has_more flag)
         '''
-        query = select(self.model).filter(
-            (self.model.title.ilike(f"%{keyword}%")) | (self.model.description.ilike(f"%{keyword}%"))
-        ).offset(skip).limit(limit)
-        result = await db.execute(query)
-        return result.scalars().all()
+        filter_query = select(self.model).filter(
+            (self.model.title.ilike(f"%{keyword}%")) | 
+            (self.model.description.ilike(f"%{keyword}%"))
+        )
+        return await self.get_multi_paginated(db, skip=skip, limit=limit, filter_query=filter_query)
 
 
 # Create CRUD instance
-book = CRUDBook(Book)
+book_crud = CRUDBook(Book)

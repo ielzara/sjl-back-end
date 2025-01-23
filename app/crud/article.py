@@ -1,10 +1,11 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
 
 from app.crud.base import CRUDBase
 from app.models.article import Article
+from app.models.topic import Topic
 from app.schemas.article import ArticleCreate, ArticleUpdate
 
 class CRUDArticle(CRUDBase[Article, ArticleCreate, ArticleUpdate]):
@@ -31,12 +32,22 @@ class CRUDArticle(CRUDBase[Article, ArticleCreate, ArticleUpdate]):
         **Returns**
         * list of article instances
         '''
-        query = select(self.model).filter(self.model.date >= start_date, self.model.date <= end_date).order_by self.model.date.desc()
+        query = select(self.model).filter(
+            self.model.date >= start_date, 
+            self.model.date <= end_date
+        ).order_by(self.model.date.desc())
 
         result = await db.execute(query)
         return result.scalars().all()
 
-    async def get_by_topic(self, db: AsyncSession, *, topic_id: int, skip: int = 0, limit: int = 10) -> Tuple[List[Article], int, bool]:
+    async def get_by_topic(
+        self, 
+        db: AsyncSession, 
+        *, 
+        topic_id: int, 
+        skip: int = 0, 
+        limit: int = 10
+    ) -> Tuple[List[Article], int, bool]:
         '''
         get articles by topic with pagination
         **Parameters**
@@ -47,12 +58,18 @@ class CRUDArticle(CRUDBase[Article, ArticleCreate, ArticleUpdate]):
         **Returns**
         * (articles, total count, has_more flag)
         '''
-
+        
         filter_query = select(self.model).join(self.model.topics).filter(Topic.id == topic_id)
-        result = await self.get_milti_paginated(db. skip=skip, limit=limit, filter_query=filter_query)
-        return result.scalars().all()
+        return await self.get_multi_paginated(db, skip=skip, limit=limit, filter_query=filter_query)
 
-    async def search(self, db: AsyncSession, *, keyword: str, skip: int = 0, limit: int = 10) -> List[Article]:
+    async def search(
+        self, 
+        db: AsyncSession, 
+        *, 
+        keyword: str, 
+        skip: int = 0, 
+        limit: int = 10
+    ) -> Tuple[List[Article], int, bool]:
         '''
         search article by keyword in title or content
         **Parameters**
@@ -61,12 +78,15 @@ class CRUDArticle(CRUDBase[Article, ArticleCreate, ArticleUpdate]):
         * `skip`: number of articles to skip
         * `limit`: number of articles to return
         **Returns**
-        * list of article instances
+        * (articles, total count, has_more flag)
         '''
+    
+        filter_query = select(self.model).filter(
+            (self.model.title.ilike(f'%{keyword}%')) | 
+            (self.model.content.ilike(f'%{keyword}%'))
+        )
 
-        query = select(self.model).filter(self.model.title.iLike(f'%keyword%') | (self.model.content.iLike(f'%keyword%'))).offset(skip).limit(limit)
-        result = await db.execute(query)
-        return result.scalars().all()
+        return await self.get_multi_paginated(db, skip=skip, limit=limit, filter_query=filter_query)
 
-# create an instance of CRUDArticle
-article = CRUDArticle(Article)
+# Create an instance of CRUDArticle
+article_crud = CRUDArticle(Article)

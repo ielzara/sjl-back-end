@@ -14,6 +14,7 @@ class ArticleBase(BaseSchema):
     url: HttpUrl
     featured: bool = False
     date: datetime
+    
 
 class ArticleCreate(ArticleBase):
     '''
