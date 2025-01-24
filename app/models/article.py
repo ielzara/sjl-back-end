@@ -16,5 +16,5 @@ class Article(Base):
     featured: Mapped[bool] = mapped_column(default=False)
 
     # Relationships
-    topics: Mapped[List["Topic"]] = relationship(secondary="article_topics", back_populates="articles")
+    topics: Mapped[List["Topic"]] = relationship(secondary="article_topics", back_populates="articles", lazy="selectin")
     books: Mapped[List["Book"]] = relationship(secondary="article_books", back_populates="articles")

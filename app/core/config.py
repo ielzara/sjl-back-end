@@ -1,6 +1,6 @@
 from typing import List
 from pydantic_settings import BaseSettings
-from pydantic import AnyHttpUrl, validator
+from pydantic import AnyHttpUrl, field_validator
 import json
 
 class Settings(BaseSettings):
@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # Database configuration
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sjl_db"
 
-    @validator("DATABASE_URL")
+    @field_validator("DATABASE_URL")
     def validate_database_url(cls, v: str) -> str:
         if v.startswith("postgresql://") or v.startswith("postgresql+asyncpg://"):
             return v
@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # CORS
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] | List[str] = ["http://localhost:3000"]
 
-    @validator("BACKEND_CORS_ORIGINS", pre=True)
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     def assemble_cors_origins(cls, v: str | List[str]) -> List[str] | str:
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",")]
@@ -35,15 +35,16 @@ class Settings(BaseSettings):
             return v
         raise ValueError(v)
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = {
+    "env_file": ".env",
+    "case_sensitive": True
+}
 
 # Global settings instance
 settings = Settings()
 
 # Log the configuration (but mask sensitive values)
-safe_settings = settings.dict()
+safe_settings = settings.model_dump()
 for key in ['AP_NEWS_API_KEY', 'GOOGLE_BOOKS_API_KEY', 'CLAUDE_API_KEY']:
     if safe_settings.get(key):
         safe_settings[key] = '***'

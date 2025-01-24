@@ -10,6 +10,6 @@ class Topic(Base):
     description: Mapped[Optional[str]]
 
     # Relationships
-    books: Mapped[List["Book"]] = relationship(secondary="book_topics", back_populates="topics")
-    articles: Mapped[List["Article"]] = relationship(secondary="article_topics", back_populates="topics")
+    books: Mapped[List["Book"]] = relationship(secondary="book_topics", back_populates="topics", lazy="selectin")
+    articles: Mapped[List["Article"]] = relationship(secondary="article_topics", back_populates="topics", lazy="selectin")
 

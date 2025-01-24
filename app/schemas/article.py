@@ -14,12 +14,6 @@ class ArticleBase(BaseSchema):
     url: HttpUrl
     featured: bool = False
     date: date
-    
-    @field_validator('date', mode='before')
-    def validate_date(cls, v):
-        if isinstance(v, str):
-            return date.fromisoformat(v)
-        return v
 
 class ArticleCreate(ArticleBase):
     '''

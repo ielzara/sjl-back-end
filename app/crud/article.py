@@ -1,7 +1,8 @@
 from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime
+from sqlalchemy.orm import selectinload
+from datetime import datetime, date
 
 from app.crud.base import CRUDBase
 from app.models.article import Article
@@ -22,7 +23,7 @@ class CRUDArticle(CRUDBase[Article, ArticleCreate, ArticleUpdate]):
         result = await db.execute(query)
         return result.scalars().all()
 
-    async def get_by_date_range(self, db: AsyncSession, *, start_date: datetime, end_date: datetime) -> List[Article]:
+    async def get_by_date_range(self, db: AsyncSession, *, start_date: date, end_date: date) -> List[Article]:
         '''
         get articles by date range
         **Parameters**
@@ -41,11 +42,11 @@ class CRUDArticle(CRUDBase[Article, ArticleCreate, ArticleUpdate]):
         return result.scalars().all()
 
     async def get_by_topic(
-        self, 
-        db: AsyncSession, 
-        *, 
-        topic_id: int, 
-        skip: int = 0, 
+        self,
+        db: AsyncSession,
+        *,
+        topic_id: int,
+        skip: int = 0,
         limit: int = 10
     ) -> Tuple[List[Article], int, bool]:
         '''
@@ -58,9 +59,15 @@ class CRUDArticle(CRUDBase[Article, ArticleCreate, ArticleUpdate]):
         **Returns**
         * (articles, total count, has_more flag)
         '''
+        statement = select(self.model).join(
+            self.model.topics
+        ).where(
+            Topic.id == topic_id
+        ).options(
+            selectinload(self.model.topics)
+        )
         
-        filter_query = select(self.model).join(self.model.topics).filter(Topic.id == topic_id)
-        return await self.get_multi_paginated(db, skip=skip, limit=limit, filter_query=filter_query)
+        return await self.get_multi_paginated(db, skip=skip, limit=limit, filter_query=statement)
 
     async def search(
         self, 

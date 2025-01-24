@@ -14,5 +14,5 @@ class Book(Base):
     isbn: Mapped[str] = mapped_column(unique=True)
 
     # Relationships
-    topics: Mapped[List["Topic"]] = relationship(secondary="book_topics", back_populates="books")
+    topics: Mapped[List["Topic"]] = relationship(secondary="book_topics", back_populates="books", lazy="selectin")
     articles: Mapped[List["Article"]] = relationship(secondary="article_books", back_populates="books")
