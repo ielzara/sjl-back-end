@@ -1,49 +1,24 @@
-from datetime import datetime
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 from pydantic import BaseModel, ConfigDict
 
+# This TypeVar is used for making our pagination response generic
 ModelType = TypeVar("ModelType")
-CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
-UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
 class BaseSchema(BaseModel):
-    '''
-    Base Pydantic schema with SQLAlchemy ORM config
-    Allows Pydantic to read SQLAlchemy model config
-    '''
+    """Base schema that all other schemas inherit from.
+    Configures Pydantic to work with SQLAlchemy models."""
     model_config = ConfigDict(from_attributes=True)
 
 class BaseDBSchema(BaseSchema):
-    '''
-    Base schema for database models with ID and timestamps
-    ''' 
+    """Schema for database models that adds ID field.
+    Used for responses that include database records."""
     id: int
 
-class BaseCreateSchema(BaseSchema):
-    '''
-    Base schema for creating new items
-    '''
-    pass
-
-class BaseUpdateSchema(BaseSchema):
-    '''
-    Base schema for updating existing items
-    '''
-    pass
-
-class BasePaginationSchema(BaseSchema):
-    '''
-    Base schema for pagination parameters
-    '''
-    skip: int = 0
-    limit: int = 10
-
-class BasePaginationResponseSchema(BaseSchema, Generic[ModelType]):
-    '''
-    Schema for paginated response with offset and limit pagination
-    '''
+class PaginatedResponse(BaseSchema, Generic[ModelType]):
+    """Schema for paginated responses.
+    Handles both pagination parameters and the response structure."""
     total: int
     items: list[ModelType]
-    skip: int
-    limit: int
+    skip: int = 0
+    limit: int = 10
     has_more: bool

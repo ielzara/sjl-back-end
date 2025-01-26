@@ -1,13 +1,11 @@
 from datetime import date
-from typing import Optional, List
-from pydantic import HttpUrl, field_validator
+from typing import Optional
+from pydantic import HttpUrl
 
 from app.schemas.base import BaseSchema, BaseDBSchema
 
 class ArticleBase(BaseSchema):
-    '''
-    Base schema for Article with shared attributes
-    '''
+    '''Base schema for Article with shared attributes'''
     title: str
     content: str
     source: str
@@ -16,15 +14,11 @@ class ArticleBase(BaseSchema):
     date: date
 
 class ArticleCreate(ArticleBase):
-    '''
-    Schema for creating a new article
-    '''
+    '''Schema for creating a new article'''
     pass
 
 class ArticleUpdate(ArticleBase):
-    '''
-    Schema for updating an existing article - all fields are optional
-    '''
+    '''Schema for updating an existing article - all fields are optional'''
     title: Optional[str] = None
     content: Optional[str] = None
     source: Optional[str] = None
@@ -33,7 +27,5 @@ class ArticleUpdate(ArticleBase):
     date: Optional[date] = None 
 
 class ArticleDB(ArticleBase, BaseDBSchema):
-    '''
-    Schema for reading an article from the database (response model)
-    '''
+    '''Schema for reading an article from the database'''
     pass

@@ -4,12 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.book import book_crud
 from app.schemas.book import BookCreate, BookUpdate, BookDB
-from app.schemas.base import BasePaginationResponseSchema
+from app.schemas.base import PaginatedResponse
 from app.core.database import get_db
 
 router = APIRouter()
 
-@router.get("", response_model=BasePaginationResponseSchema[BookDB])
+@router.get("", response_model=PaginatedResponse[BookDB])
 async def get_books(
     db: AsyncSession = Depends(get_db),
     skip: int = Query(0, ge=0),
@@ -17,19 +17,8 @@ async def get_books(
     topic_id: Optional[int] = None,
     author: Optional[str] = None,
     keyword: Optional[str] = None,
-) -> BasePaginationResponseSchema[BookDB]:
-    '''
-    get books with pagination and optional filters
-    **Parameters**
-    * `db`: AsyncSession instance
-    * `skip`: number of books to skip
-    * `limit`: number of books to return
-    * `topic_id`: topic id
-    * `author`: author name
-    * `keyword`: search keyword
-    **Returns**
-    * paginated response of book instances
-    '''
+) -> PaginatedResponse[BookDB]:
+    '''Get books with pagination and optional filters'''
     if topic_id:
         items, total, has_more = await book_crud.get_by_topic(
             db, topic_id=topic_id, skip=skip, limit=limit
@@ -47,7 +36,7 @@ async def get_books(
             db, skip=skip, limit=limit
         )
 
-    return BasePaginationResponseSchema(
+    return PaginatedResponse(
         total=total,
         items=items,
         skip=skip,
@@ -57,14 +46,7 @@ async def get_books(
 
 @router.get("/{book_id}", response_model=BookDB)
 async def get_book(book_id: int, db: AsyncSession = Depends(get_db)) -> BookDB:
-    '''
-    get a specific book by id
-    **Parameters**
-    * `book_id`: book id
-    * `db`: AsyncSession instance
-    **Returns**
-    * book instance
-    '''
+    '''Get a specific book by id'''
     book = await book_crud.get(db, id=book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -72,14 +54,7 @@ async def get_book(book_id: int, db: AsyncSession = Depends(get_db)) -> BookDB:
 
 @router.get("/isbn/{isbn}", response_model=BookDB)
 async def get_book_by_isbn(isbn: str, db: AsyncSession = Depends(get_db)) -> BookDB:
-    '''
-    get a specific book by ISBN
-    **Parameters**
-    * `isbn`: book ISBN
-    * `db`: AsyncSession instance
-    **Returns**
-    * book instance
-    '''
+    '''Get a specific book by ISBN'''
     book = await book_crud.get_by_isbn(db, isbn=isbn)
     if book is None:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -87,14 +62,7 @@ async def get_book_by_isbn(isbn: str, db: AsyncSession = Depends(get_db)) -> Boo
 
 @router.post("", response_model=BookDB, status_code=201)
 async def create_book(book_in: BookCreate, db: AsyncSession = Depends(get_db)) -> BookDB:
-    '''
-    create a new book
-    **Parameters**
-    * `book_in`: BookCreate instance
-    * `db`: AsyncSession instance
-    **Returns**
-    * book instance
-    '''
+    '''Create a new book'''
     book = await book_crud.create(db, obj_in=book_in)
     return book
 
@@ -104,15 +72,7 @@ async def update_book(
     book_in: BookUpdate,
     db: AsyncSession = Depends(get_db)
 ) -> BookDB:
-    '''
-    update an existing book
-    **Parameters**
-    * `book_id`: book id
-    * `book_in`: BookUpdate instance
-    * `db`: AsyncSession instance
-    **Returns**
-    * book instance
-    '''
+    '''Update an existing book'''
     book = await book_crud.get(db, id=book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -121,12 +81,7 @@ async def update_book(
 
 @router.delete("/{book_id}", status_code=204)
 async def delete_book(book_id: int, db: AsyncSession = Depends(get_db)):
-    '''
-    delete an existing book
-    **Parameters**
-    * `book_id`: book id
-    * `db`: AsyncSession instance
-    '''
+    '''Delete an existing book'''
     book = await book_crud.get(db, id=book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="Book not found")

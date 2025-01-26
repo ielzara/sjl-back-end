@@ -1,51 +1,35 @@
-from typing import List
-from pydantic_settings import BaseSettings
-from pydantic import AnyHttpUrl, field_validator
-import json
+from dotenv import load_dotenv
+import os
 
-class Settings(BaseSettings):
-    # API
-    API_VERSION: str = "1.0.0"
-    PROJECT_NAME: str = "Social Justice Library API"
-    ENVIRONMENT: str = "development"
+# Loading environment variables at the start
+load_dotenv()
 
-    # Database configuration
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sjl_db"
+class Settings:
+    """
+    Application settings that loads and provides access to all environment variables.
+    This class serves as a central configuration point for all external services
+    and database connections in our application.
+    """
+    
+    def __init__(self):
+        # Database connection settings
+        # This URL will be used by SQLAlchemy to establish database connections
+        self.DATABASE_URL = os.getenv("DATABASE_URL")
+        
+        # Guardian News API settings
+        # These will be used to make requests to The Guardian's content API
+        self.GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY")
+        self.GUARDIAN_BASE_URL = os.getenv("GUARDIAN_BASE_URL")
+        
+        # Google Books API settings
+        # These will be used to search for and retrieve book information
+        self.GOOGLE_BOOKS_API_KEY = os.getenv("GOOGLE_BOOKS_API_KEY")
+        self.GOOGLE_BOOKS_BASE_URL = os.getenv("GOOGLE_BOOKS_BASE_URL")
+        
+        # Claude AI API settings
+        # These will be used for content analysis and book recommendations
+        self.CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+        self.CLAUDE_BASE_URL = os.getenv("CLAUDE_BASE_URL")
 
-    @field_validator("DATABASE_URL")
-    def validate_database_url(cls, v: str) -> str:
-        if v.startswith("postgresql://") or v.startswith("postgresql+asyncpg://"):
-            return v
-        raise ValueError("DATABASE_URL must start with postgresql:// or postgresql+asyncpg://")
-
-    # External APIs
-    AP_NEWS_API_KEY: str | None = None
-    AP_NEWS_BASE_URL: str = "https://api.ap.org/v2"  
-    GOOGLE_BOOKS_API_KEY: str | None = None
-    CLAUDE_API_KEY: str | None = None
-
-    # CORS
-    BACKEND_CORS_ORIGINS: List[AnyHttpUrl] | List[str] = ["http://localhost:3000"]
-
-    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
-    def assemble_cors_origins(cls, v: str | List[str]) -> List[str] | str:
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
-
-    model_config = {
-    "env_file": ".env",
-    "case_sensitive": True
-}
-
-# Global settings instance
+# Creating a single instance of Settings to be used throughout the application
 settings = Settings()
-
-# Log the configuration (but mask sensitive values)
-safe_settings = settings.model_dump()
-for key in ['AP_NEWS_API_KEY', 'GOOGLE_BOOKS_API_KEY', 'CLAUDE_API_KEY']:
-    if safe_settings.get(key):
-        safe_settings[key] = '***'
-print(f"Initialized settings: {json.dumps(safe_settings, indent=2)}")

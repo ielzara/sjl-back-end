@@ -1,33 +1,22 @@
-from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, mapped_column, Mapped
-from sqlalchemy import DateTime
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from .config import settings
-
-print(f"Connecting to database with URL: {settings.DATABASE_URL}")
 
 class Base(DeclarativeBase):
     """Base class for all database models"""
     pass
-# Create database engine
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True  # Enable automatic reconnection
-)
 
-# Create AsyncSessionLocal class
+# Create database engine with minimal configuration
+engine = create_async_engine(settings.DATABASE_URL)
+
+# Create session factory with async support
 AsyncSessionLocal = sessionmaker(
     engine,
     class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
+    expire_on_commit=False
 )
 
-# Dependency to get DB session
+# Dependency for FastAPI to get database sessions
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+        yield session

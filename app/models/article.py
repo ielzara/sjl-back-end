@@ -7,7 +7,7 @@ from app.core.database import Base
 class Article(Base):
     __tablename__ = "articles"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str]
     date: Mapped[date] = mapped_column(Date)
     content: Mapped[str]
@@ -16,5 +16,13 @@ class Article(Base):
     featured: Mapped[bool] = mapped_column(default=False)
 
     # Relationships
-    topics: Mapped[List["Topic"]] = relationship(secondary="article_topics", back_populates="articles", lazy="selectin")
-    books: Mapped[List["Book"]] = relationship(secondary="article_books", back_populates="articles")
+    topics: Mapped[List["Topic"]] = relationship(
+        secondary="article_topics",
+        back_populates="articles",
+        lazy="selectin"
+    )
+    books: Mapped[List["Book"]] = relationship(
+        secondary="article_books",
+        back_populates="articles",
+        lazy="selectin"
+    )

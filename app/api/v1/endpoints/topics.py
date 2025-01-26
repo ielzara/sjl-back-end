@@ -4,30 +4,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.topic import topic_crud
 from app.schemas.topic import TopicCreate, TopicUpdate, TopicDB, TopicWithCountsDB
-from app.schemas.base import BasePaginationResponseSchema
+from app.schemas.base import PaginatedResponse
 from app.core.database import get_db
 
 router = APIRouter()
 
-@router.get("", response_model=BasePaginationResponseSchema[TopicWithCountsDB])
+@router.get("", response_model=PaginatedResponse[TopicWithCountsDB])
 async def get_topics(
     db: AsyncSession = Depends(get_db),
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
     keyword: Optional[str] = None,
     include_counts: bool = False
-) -> BasePaginationResponseSchema[TopicWithCountsDB]:
-    '''
-    get topics with pagination and optional filtering
-    **Parameters**
-    * `db`: AsyncSession instance
-    * `skip`: number of topics to skip
-    * `limit`: number of topics to return
-    * `keyword`: search keyword
-    * `include_counts`: whether to include article and book counts
-    **Returns**
-    * paginated response of topic instances
-    '''
+) -> PaginatedResponse[TopicWithCountsDB]:
+    '''Get topics with pagination and optional filtering'''
     if include_counts:
         items, total, has_more = await topic_crud.get_with_counts(
             db, skip=skip, limit=limit
@@ -41,7 +31,7 @@ async def get_topics(
             db, skip=skip, limit=limit
         )
 
-    return BasePaginatedResponseSchema(
+    return PaginatedResponse(
         total=total,
         items=items,
         skip=skip,
@@ -54,14 +44,7 @@ async def get_topic(
     topic_id: int,
     db: AsyncSession = Depends(get_db)
 ) -> TopicDB:
-    '''
-    get a specific topic by id
-    **Parameters**
-    * `topic_id`: topic id
-    * `db`: AsyncSession instance
-    **Returns**
-    * topic instance
-    '''
+    '''Get a specific topic by id'''
     topic = await topic_crud.get(db, id=topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
@@ -72,14 +55,7 @@ async def get_topic_by_name(
     name: str,
     db: AsyncSession = Depends(get_db)
 ) -> TopicDB:
-    '''
-    get a specific topic by name
-    **Parameters**
-    * `name`: topic name
-    * `db`: AsyncSession instance
-    **Returns**
-    * topic instance
-    '''
+    '''Get a specific topic by name'''
     topic = await topic_crud.get_by_name(db, name=name)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
@@ -90,15 +66,7 @@ async def create_topic(
     topic_in: TopicCreate,
     db: AsyncSession = Depends(get_db)
 ) -> TopicDB:
-    '''
-    create a new topic
-    **Parameters**
-    * `topic_in`: TopicCreate instance
-    * `db`: AsyncSession instance
-    **Returns**
-    * topic instance
-    '''
-    # Check if topic with same name already exists
+    '''Create a new topic'''
     existing_topic = await topic_crud.get_by_name(db, name=topic_in.name)
     if existing_topic:
         raise HTTPException(
@@ -113,20 +81,11 @@ async def update_topic(
     topic_in: TopicUpdate,
     db: AsyncSession = Depends(get_db)
 ) -> TopicDB:
-    '''
-    update an existing topic
-    **Parameters**
-    * `topic_id`: topic id
-    * `topic_in`: TopicUpdate instance
-    * `db`: AsyncSession instance
-    **Returns**
-    * topic instance
-    '''
+    '''Update an existing topic'''
     topic = await topic_crud.get(db, id=topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
     
-    # If name is being updated, check for duplicates
     if topic_in.name:
         existing_topic = await topic_crud.get_by_name(db, name=topic_in.name)
         if existing_topic and existing_topic.id != topic_id:
@@ -142,12 +101,7 @@ async def delete_topic(
     topic_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    '''
-    delete an existing topic
-    **Parameters**
-    * `topic_id`: topic id
-    * `db`: AsyncSession instance
-    '''
+    '''Delete an existing topic'''
     topic = await topic_crud.get(db, id=topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")

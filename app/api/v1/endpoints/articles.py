@@ -1,17 +1,16 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
 
 from app.crud.article import article_crud
 from app.schemas.article import ArticleCreate, ArticleUpdate, ArticleDB
-from app.schemas.base import BasePaginationResponseSchema
+from app.schemas.base import PaginatedResponse
 from app.core.database import get_db
 
 router = APIRouter()
 
-@router.get("", response_model=BasePaginationResponseSchema[ArticleDB])
+@router.get("", response_model=PaginatedResponse[ArticleDB])
 async def get_articles(
     db: AsyncSession = Depends(get_db),
     skip: int = Query(0, ge=0),
@@ -21,21 +20,8 @@ async def get_articles(
     keyword: Optional[str] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-) -> BasePaginationResponseSchema[ArticleDB]:
-    '''
-    get articles with pagination and optional filters
-    **Parameters**
-    * `db`: AsyncSession instance
-    * `skip`: number of articles to skip
-    * `limit`: number of articles to return
-    * `topic_id`: topic id
-    * `featured`: filter by featured status
-    * `keyword`: search keyword
-    * `start_date`: start date
-    * `end_date`: end date
-    **Returns**
-    * paginated response of article instances
-    '''
+) -> PaginatedResponse[ArticleDB]:
+    '''Get articles with pagination and optional filters'''
     if topic_id:
         items, total, has_more = await article_crud.get_by_topic(
             db, topic_id=topic_id, skip=skip, limit=limit
@@ -59,7 +45,7 @@ async def get_articles(
             db, skip=skip, limit=limit
         )
 
-    return BasePaginationResponseSchema(
+    return PaginatedResponse(
         total=total,
         items=items,
         skip=skip,
@@ -69,14 +55,7 @@ async def get_articles(
 
 @router.get("/{article_id}", response_model=ArticleDB)
 async def get_article(article_id: int, db: AsyncSession = Depends(get_db)) -> ArticleDB:
-    '''
-    get a specific article by id
-    **Parameters**
-    * `article_id`: article id
-    * `db`: AsyncSession instance
-    **Returns**
-    * article instance
-    '''
+    '''Get a specific article by id'''
     article = await article_crud.get(db, id=article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -84,41 +63,23 @@ async def get_article(article_id: int, db: AsyncSession = Depends(get_db)) -> Ar
 
 @router.post("", response_model=ArticleDB, status_code=201)
 async def create_article(article_in: ArticleCreate, db: AsyncSession = Depends(get_db)) -> ArticleDB:
-    '''
-    create a new article
-    **Parameters**
-    * `article_in`: ArticleCreate instance
-    * `db`: AsyncSession instance
-    **Returns**
-    * article instance
-    '''
+    '''Create a new article'''
     try:
         data = article_in.model_dump()
         if isinstance(data['date'], str):
             data['date'] = date.fromisoformat(data['date'])
         
         article = await article_crud.create(db, obj_in=data)
-        print("Created article:", article.__dict__)  # Debug print
-        
         if article is None:
             raise HTTPException(status_code=500, detail="Failed to create article")
         
         return article
     except Exception as e:
-        print("Error:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{article_id}", response_model=ArticleDB)
 async def update_article(article_id: int, article_in: ArticleUpdate, db: AsyncSession = Depends(get_db)) -> ArticleDB:
-    '''
-    update an existing article
-    **Parameters**
-    * `article_id`: article id
-    * `article_in`: ArticleUpdate instance
-    * `db`: AsyncSession instance
-    **Returns**
-    * article instance
-    '''
+    '''Update an existing article'''
     article = await article_crud.get(db, id=article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -127,12 +88,7 @@ async def update_article(article_id: int, article_in: ArticleUpdate, db: AsyncSe
 
 @router.delete("/{article_id}", status_code=204)
 async def delete_article(article_id: int, db: AsyncSession = Depends(get_db)):
-    '''
-    delete an existing article
-    **Parameters**
-    * `article_id`: article id
-    * `db`: AsyncSession instance
-    '''
+    '''Delete an existing article'''
     article = await article_crud.get(db, id=article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
