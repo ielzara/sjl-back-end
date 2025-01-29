@@ -1,3 +1,4 @@
+from typing import List
 from dotenv import load_dotenv
 import os
 
@@ -12,24 +13,27 @@ class Settings:
     """
     
     def __init__(self):
-        # Database connection settings
-        # This URL will be used by SQLAlchemy to establish database connections
+        # API Configuration
+        self.API_VERSION = os.getenv("API_VERSION", "1.0.0")
+        self.PROJECT_NAME = os.getenv("PROJECT_NAME", "Social Justice Library API")
+        self.ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+        
+        # Database Configuration
         self.DATABASE_URL = os.getenv("DATABASE_URL")
         
-        # Guardian News API settings
-        # These will be used to make requests to The Guardian's content API
+        # CORS Configuration
+        self.BACKEND_CORS_ORIGINS: List[str] = eval(os.getenv("BACKEND_CORS_ORIGINS", "[]"))
+        
+        # Guardian News API Configuration
         self.GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY")
         self.GUARDIAN_BASE_URL = os.getenv("GUARDIAN_BASE_URL")
         
-        # Google Books API settings
-        # These will be used to search for and retrieve book information
+        # Google Books API Configuration
         self.GOOGLE_BOOKS_API_KEY = os.getenv("GOOGLE_BOOKS_API_KEY")
         self.GOOGLE_BOOKS_BASE_URL = os.getenv("GOOGLE_BOOKS_BASE_URL")
         
-        # Claude AI API settings
-        # These will be used for content analysis and book recommendations
-        self.CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
-        self.CLAUDE_BASE_URL = os.getenv("CLAUDE_BASE_URL")
+        # Anthropic API Configuration
+        self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 # Creating a single instance of Settings to be used throughout the application
 settings = Settings()

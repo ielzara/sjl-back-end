@@ -1,50 +1,63 @@
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict, Any
 import httpx
 from datetime import datetime
+from pydantic import HttpUrl
 
 from app.core.config import settings
-from app.schemas.guardian import GuardianResponse, GuardianArticle
 from app.schemas.article import ArticleCreate
 
 class GuardianNewsService:
     """Service for interacting with The Guardian API"""
     
+    # Core social justice themes and action terms
+    SOCIAL_JUSTICE_QUERY = (
+        "("
+            '("racial justice" OR "civil rights" OR "systemic racism" OR "racial discrimination" OR "racial equity") OR '
+            '("economic justice" OR "income inequality" OR "wealth gap" OR "economic discrimination" OR "housing crisis") OR '
+            '("environmental justice" OR "climate justice" OR "environmental racism" OR "pollution impact") OR '
+            '("gender equality" OR "women\'s rights" OR "gender discrimination" OR "reproductive rights" OR "pay gap") OR '
+            '("healthcare access" OR "health equity" OR "healthcare discrimination" OR "mental health crisis") OR '
+            '("protest" OR "activism" OR "legislation" OR "lawsuit" OR "discrimination" OR "human rights" OR "inequality")'
+        ")"
+    )
+    
     def __init__(self):
-        """Initialize the Guardian News service with configuration"""
         self.base_url = settings.GUARDIAN_BASE_URL
         self.api_key = settings.GUARDIAN_API_KEY
         if not self.api_key:
             raise ValueError("Guardian API key not configured")
 
     async def _make_request(self, endpoint: str, params: dict) -> dict:
-        """
-        Make an HTTP request to the Guardian API
-        
-        Args:
-            endpoint: API endpoint path
-            params: Query parameters for the request
-            
-        Returns:
-            API response as dictionary
-            
-        Raises:
-            HTTPError: If the request fails
-        """
-        # Always include the API key
+        """Make an HTTP request to the Guardian API"""
         params['api-key'] = self.api_key
-        
-        # Add fields we want to retrieve
         if 'show-fields' not in params:
-            params['show-fields'] = 'body,bodyText,headline,trailText'
+            params['show-fields'] = 'body,bodyText,headline,trailText,sectionName'
+        
+        # Add tag filters to exclude certain content types
+        params['tag'] = '-type/obituaries,-type/letters'
             
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{self.base_url}/{endpoint}",
                 params=params,
-                timeout=30.0  # 30 second timeout
+                timeout=30.0
             )
             response.raise_for_status()
             return response.json()
+
+    def _parse_article_data(self, article_data: Dict[str, Any]) -> ArticleCreate:
+        """Parse raw Guardian API article data into ArticleCreate model"""
+        fields = article_data.get('fields', {})
+        content = fields.get('bodyText') or fields.get('body', '')
+        
+        return ArticleCreate(
+            title=article_data['webTitle'],
+            date=datetime.fromisoformat(article_data['webPublicationDate'].replace('Z', '+00:00')).date(),
+            content=content,
+            source="The Guardian",
+            url=str(article_data['webUrl']),
+            featured=False
+        )
 
     async def search_articles(
         self,
@@ -53,22 +66,8 @@ class GuardianNewsService:
         page_size: int = 10,
         from_date: Optional[datetime] = None,
         to_date: Optional[datetime] = None,
-        section: Optional[str] = None,
-    ) -> Tuple[List[GuardianArticle], int]:
-        """
-        Search for articles using the Guardian API
-        
-        Args:
-            query: Search query string
-            page: Page number (1-based)
-            page_size: Number of results per page
-            from_date: Optional start date for filtering
-            to_date: Optional end date for filtering
-            section: Optional section name for filtering
-            
-        Returns:
-            Tuple of (list of articles, total number of results)
-        """
+    ) -> Tuple[List[ArticleCreate], int]:
+        """Search for articles using the Guardian API"""
         params = {
             'q': query,
             'page': page,
@@ -76,37 +75,31 @@ class GuardianNewsService:
             'order-by': 'newest'
         }
         
-        # Add optional filters
         if from_date:
             params['from-date'] = from_date.strftime('%Y-%m-%d')
         if to_date:
             params['to-date'] = to_date.strftime('%Y-%m-%d')
-        if section:
-            params['section'] = section
             
         response_data = await self._make_request('search', params)
-        response = GuardianResponse(**response_data['response'])
+        guardian_response = response_data['response']
         
-        return response.results, response.total
-    
-    def convert_to_article_create(self, guardian_article: GuardianArticle) -> ArticleCreate:
-        """
-        Convert a Guardian API article to our internal ArticleCreate format
+        articles = [
+            self._parse_article_data(article_data) 
+            for article_data in guardian_response['results']
+        ]
         
-        Args:
-            guardian_article: Article from Guardian API
-            
-        Returns:
-            ArticleCreate instance ready for database insertion
-        """
-        # Use bodyText if available (plain text), otherwise fall back to body (HTML)
-        content = guardian_article.fields.bodyText if guardian_article.fields.bodyText else guardian_article.fields.body
-        
-        return ArticleCreate(
-            title=guardian_article.webTitle,
-            date=guardian_article.webPublicationDate.date(),
-            content=content or "",  # Ensure we never have None content
-            source="The Guardian",
-            url=str(guardian_article.webUrl),
-            featured=False  # Default to not featured
+        return articles, guardian_response['total']
+
+    async def get_recent_social_justice_articles(
+        self,
+        page: int = 1,
+        page_size: int = 10,
+        from_date: Optional[datetime] = None,
+    ) -> Tuple[List[ArticleCreate], int]:
+        """Get recent articles related to social justice topics"""
+        return await self.search_articles(
+            query=self.SOCIAL_JUSTICE_QUERY,
+            page=page,
+            page_size=page_size,
+            from_date=from_date
         )
