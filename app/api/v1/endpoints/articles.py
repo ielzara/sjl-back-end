@@ -1,12 +1,20 @@
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.crud.article import article_crud
 from app.schemas.article import ArticleCreate, ArticleUpdate, ArticleDB
 from app.schemas.base import PaginatedResponse
+from app.schemas.book import BookDB
 from app.core.database import get_db
+import logging
+
+from app.schemas.topic import TopicDB
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -60,6 +68,46 @@ async def get_article(article_id: int, db: AsyncSession = Depends(get_db)) -> Ar
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
     return article
+
+from app.models.article import Article
+
+@router.get("/{article_id}/books", response_model=List[BookDB])
+async def get_article_books(
+    article_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> List[BookDB]:
+    '''Get all books linked to a specific article'''
+    result = await db.execute(
+        select(Article)
+        .options(selectinload(Article.books))
+        .where(Article.id == article_id)
+    )
+    article = result.scalar_one_or_none()
+    
+    if article is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    logger.info(f"Found {len(article.books)} books for article {article_id}")
+    return article.books
+
+@router.get("/{article_id}/topics", response_model=List[TopicDB])
+async def get_article_topics(
+    article_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> List[TopicDB]:
+    '''Get all topics associated with an article'''
+    result = await db.execute(
+        select(Article)
+        .options(selectinload(Article.topics))
+        .where(Article.id == article_id)
+    )
+    article = result.scalar_one_or_none()
+    
+    if article is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    logger.info(f"Found {len(article.topics)} topics for article {article_id}")
+    return article.topics
 
 @router.post("", response_model=ArticleDB, status_code=201)
 async def create_article(article_in: ArticleCreate, db: AsyncSession = Depends(get_db)) -> ArticleDB:

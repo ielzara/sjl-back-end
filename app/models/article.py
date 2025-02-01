@@ -1,28 +1,20 @@
-from datetime import date
-from sqlalchemy import Date
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import datetime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Table, Text
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from typing import List
+
 from app.core.database import Base
 
 class Article(Base):
     __tablename__ = "articles"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    title: Mapped[str]
-    date: Mapped[date] = mapped_column(Date)
-    content: Mapped[str]
-    source: Mapped[str]
-    url: Mapped[str] = mapped_column(unique=True)
-    featured: Mapped[bool] = mapped_column(default=False)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String, index=True)
+    date: Mapped[datetime] = mapped_column(DateTime)
+    content: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String, index=True)
+    url: Mapped[str] = mapped_column(String, unique=True, index=True)
+    featured: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    # Relationships
-    topics: Mapped[List["Topic"]] = relationship(
-        secondary="article_topics",
-        back_populates="articles",
-        lazy="selectin"
-    )
-    books: Mapped[List["Book"]] = relationship(
-        secondary="article_books",
-        back_populates="articles",
-        lazy="selectin"
-    )
+    topics = relationship("Topic", secondary="article_topics", back_populates="articles", lazy="selectin")
+    books = relationship("Book", secondary="article_books", back_populates="articles")

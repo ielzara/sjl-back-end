@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,6 +6,8 @@ from app.crud.book import book_crud
 from app.schemas.book import BookCreate, BookUpdate, BookDB
 from app.schemas.base import PaginatedResponse
 from app.core.database import get_db
+from app.schemas.article import ArticleDB
+from app.schemas.topic import TopicDB
 
 router = APIRouter()
 
@@ -59,6 +61,28 @@ async def get_book_by_isbn(isbn: str, db: AsyncSession = Depends(get_db)) -> Boo
     if book is None:
         raise HTTPException(status_code=404, detail="Book not found")
     return book
+
+@router.get("/{book_id}/articles", response_model=List[ArticleDB])
+async def get_book_articles(
+    book_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> List[ArticleDB]:
+    '''Get all articles that reference this book'''
+    book = await book_crud.get(db, id=book_id)
+    if book is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+    return book.articles
+
+@router.get("/{book_id}/topics", response_model=List[TopicDB])
+async def get_book_topics(
+    book_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> List[TopicDB]:
+    '''Get all topics associated with this book'''
+    book = await book_crud.get(db, id=book_id)
+    if book is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+    return book.topics
 
 @router.post("", response_model=BookDB, status_code=201)
 async def create_book(book_in: BookCreate, db: AsyncSession = Depends(get_db)) -> BookDB:

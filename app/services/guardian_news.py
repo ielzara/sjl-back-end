@@ -1,15 +1,17 @@
 from typing import Optional, Tuple, List, Dict, Any
 import httpx
+import logging
 from datetime import datetime
 from pydantic import HttpUrl
 
 from app.core.config import settings
 from app.schemas.article import ArticleCreate
 
+logger = logging.getLogger(__name__)
+
 class GuardianNewsService:
     """Service for interacting with The Guardian API"""
     
-    # Core social justice themes and action terms
     SOCIAL_JUSTICE_QUERY = (
         "("
             '("racial justice" OR "civil rights" OR "systemic racism" OR "racial discrimination" OR "racial equity") OR '
@@ -26,38 +28,7 @@ class GuardianNewsService:
         self.api_key = settings.GUARDIAN_API_KEY
         if not self.api_key:
             raise ValueError("Guardian API key not configured")
-
-    async def _make_request(self, endpoint: str, params: dict) -> dict:
-        """Make an HTTP request to the Guardian API"""
-        params['api-key'] = self.api_key
-        if 'show-fields' not in params:
-            params['show-fields'] = 'body,bodyText,headline,trailText,sectionName'
-        
-        # Add tag filters to exclude certain content types
-        params['tag'] = '-type/obituaries,-type/letters'
-            
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.base_url}/{endpoint}",
-                params=params,
-                timeout=30.0
-            )
-            response.raise_for_status()
-            return response.json()
-
-    def _parse_article_data(self, article_data: Dict[str, Any]) -> ArticleCreate:
-        """Parse raw Guardian API article data into ArticleCreate model"""
-        fields = article_data.get('fields', {})
-        content = fields.get('bodyText') or fields.get('body', '')
-        
-        return ArticleCreate(
-            title=article_data['webTitle'],
-            date=datetime.fromisoformat(article_data['webPublicationDate'].replace('Z', '+00:00')).date(),
-            content=content,
-            source="The Guardian",
-            url=str(article_data['webUrl']),
-            featured=False
-        )
+        logger.info(f"Guardian API initialized with base_url: {self.base_url}")
 
     async def search_articles(
         self,
@@ -68,6 +39,7 @@ class GuardianNewsService:
         to_date: Optional[datetime] = None,
     ) -> Tuple[List[ArticleCreate], int]:
         """Search for articles using the Guardian API"""
+        logger.info(f"Searching Guardian API with query: {query}")
         params = {
             'q': query,
             'page': page,
@@ -80,15 +52,62 @@ class GuardianNewsService:
         if to_date:
             params['to-date'] = to_date.strftime('%Y-%m-%d')
             
-        response_data = await self._make_request('search', params)
-        guardian_response = response_data['response']
+        logger.info(f"Request params: {params}")
         
-        articles = [
-            self._parse_article_data(article_data) 
-            for article_data in guardian_response['results']
-        ]
+        try:
+            response_data = await self._make_request('search', params)
+            guardian_response = response_data['response']
+            
+            articles = [
+                self._parse_article_data(article_data) 
+                for article_data in guardian_response['results']
+            ]
+            
+            logger.info(f"Found {len(articles)} articles, total: {guardian_response['total']}")
+            return articles, guardian_response['total']
         
-        return articles, guardian_response['total']
+        except Exception as e:
+            logger.error(f"Error in Guardian API search: {str(e)}", exc_info=True)
+            return [], 0
+
+    async def _make_request(self, endpoint: str, params: dict) -> dict:
+        """Make an HTTP request to the Guardian API"""
+        params['api-key'] = self.api_key
+        if 'show-fields' not in params:
+            params['show-fields'] = 'body,bodyText,headline,trailText,sectionName'
+        
+        params['tag'] = '-type/obituaries,-type/letters'
+            
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.base_url}/{endpoint}",
+                    params=params,
+                    timeout=30.0
+                )
+                response.raise_for_status()
+                return response.json()
+        except Exception as e:
+            logger.error(f"API request error: {str(e)}")
+            raise
+
+    def _parse_article_data(self, article_data: Dict[str, Any]) -> ArticleCreate:
+        """Parse raw Guardian API data into ArticleCreate model"""
+        try:
+            fields = article_data.get('fields', {})
+            content = fields.get('bodyText') or fields.get('body', '')
+            
+            return ArticleCreate(
+                title=article_data['webTitle'],
+                date=datetime.fromisoformat(article_data['webPublicationDate'].replace('Z', '+00:00')).date(),
+                content=content,
+                source="The Guardian",
+                url=str(article_data['webUrl']),
+                featured=False
+            )
+        except Exception as e:
+            logger.error(f"Error parsing article data: {str(e)}")
+            raise
 
     async def get_recent_social_justice_articles(
         self,
@@ -97,6 +116,8 @@ class GuardianNewsService:
         from_date: Optional[datetime] = None,
     ) -> Tuple[List[ArticleCreate], int]:
         """Get recent articles related to social justice topics"""
+        logger.info("Getting recent social justice articles")
+        logger.info(f"Query: {self.SOCIAL_JUSTICE_QUERY}")
         return await self.search_articles(
             query=self.SOCIAL_JUSTICE_QUERY,
             page=page,
