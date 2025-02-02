@@ -1,158 +1,113 @@
-import asyncio
 import pytest
-from typing import AsyncGenerator
-from datetime import datetime, date
+from datetime import datetime, UTC
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
-from sqlalchemy import text
+from httpx import AsyncClient
 
-from app.core.config import Settings
 from app.core.database import Base, get_db
 from app.main import app
 
-# Test database URL
+# Test database setup
 TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/sjl_test_db"
+engine_test = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+async_session = sessionmaker(engine_test, class_=AsyncSession, expire_on_commit=False)
 
-# Create async engine for tests
-engine_test = create_async_engine(
-    TEST_DATABASE_URL,
-    poolclass=NullPool,
-)
-
-# Create async session for tests
-async_session_maker = sessionmaker(
-    engine_test,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-# Using pytest-asyncio's built-in event_loop fixture
-# No need to define our own event_loop fixture
-
-async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Override database dependency."""
-    async with async_session_maker() as session:
+async def override_get_db():
+    async with async_session() as session:
         yield session
 
-# Override the database dependency
 app.dependency_overrides[get_db] = override_get_db
 
-@pytest.fixture(scope="session")
-async def test_db_setup():
-    """Set up test database."""
+@pytest.fixture(autouse=True)
+async def setup_db():
     async with engine_test.begin() as conn:
-        await conn.execute(text("DROP TABLE IF EXISTS article_topics CASCADE"))
-        await conn.execute(text("DROP TABLE IF EXISTS book_topics"))
-        await conn.execute(text("DROP TABLE IF EXISTS articles"))
-        await conn.execute(text("DROP TABLE IF EXISTS books"))
-        await conn.execute(text("DROP TABLE IF EXISTS topics"))
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with engine_test.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 @pytest.fixture
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Create a clean database session for a test."""
-    # Create a new engine for test
-    test_engine = create_async_engine(
-        TEST_DATABASE_URL,
-        poolclass=NullPool
-    )
-
-    # Create the tables
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    # Create session for test
-    test_async_session = sessionmaker(
-        bind=test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False
-    )
-
-    session = test_async_session()
-    try:
-        yield session
-    finally:
-        await session.close()
-        # Drop the tables
-        async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-        await test_engine.dispose()
+def app():
+    from app.main import app
+    return app
 
 @pytest.fixture
-def sample_article_data():
-    """Get sample article data."""
+def client(app):
+    return TestClient(app)
+
+@pytest.fixture
+async def async_client():
+    """Async client fixture"""
+    async with AsyncClient(
+        app=app,
+        base_url="http://test",
+        backend="asyncio"
+    ) as ac:
+        yield ac
+
+@pytest.fixture
+async def db():
+    async with async_session() as session:
+        yield session
+        await session.rollback()
+
+@pytest.fixture
+def article_data():
     return {
         "title": "Test Article",
-        "content": "This is a test article content",
+        "content": "Test content",
         "source": "Test Source",
         "url": "http://test.com/article",
         "featured": False,
-        "date": date.today()  # Using date instead of datetime
+        "date": datetime.now(UTC).date().isoformat()
     }
 
 @pytest.fixture
-def sample_book_data():
-    """Get sample book data."""
+def book_data():
     return {
         "title": "Test Book",
         "author": "Test Author",
-        "description": "This is a test book description",
+        "description": "Test description",
         "url": "http://test.com/book",
         "cover_url": "http://test.com/cover",
-        "isbn": "1234567890123"
+        "isbn": "9781234567890"
     }
 
 @pytest.fixture
-def sample_topic_data():
-    """Get sample topic data."""
+def topic_data():
     return {
         "name": "Test Topic",
-        "description": "This is a test topic description"
+        "description": "Test description"
     }
 
 @pytest.fixture
-async def test_article(db_session: AsyncSession, sample_article_data: dict):
-    """Create a test article."""
+async def test_article(db, article_data):
     from app.models.article import Article
-    article = Article(**sample_article_data)
-    db_session.add(article)
-    await db_session.flush()
-    await db_session.refresh(article)
+    article_dict = article_data.copy()
+    article_dict["date"] = datetime.fromisoformat(article_dict["date"])
+    article = Article(**article_dict)
+    db.add(article)
+    await db.commit()
+    await db.refresh(article)
     return article
 
 @pytest.fixture
-async def test_book(db_session: AsyncSession, sample_book_data: dict):
-    """Create a test book."""
+async def test_book(db, book_data):
     from app.models.book import Book
-    book = Book(**sample_book_data)
-    db_session.add(book)
-    await db_session.commit()
-    await db_session.refresh(book)
+    book = Book(**book_data)
+    db.add(book)
+    await db.commit()
+    await db.refresh(book)
     return book
 
 @pytest.fixture
-async def test_topic(db_session: AsyncSession, sample_topic_data: dict):
-    """Create a test topic."""
+async def test_topic(db, topic_data):
     from app.models.topic import Topic
-    topic = Topic(**sample_topic_data)
-    db_session.add(topic)
-    await db_session.commit()
-    await db_session.refresh(topic)
+    topic = Topic(**topic_data)
+    db.add(topic)
+    await db.commit()
+    await db.refresh(topic)
     return topic
-
-@pytest.fixture
-async def client():
-    """Get test client."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        yield client
-
-@pytest.fixture
-def sync_client():
-    """Get synchronous test client."""
-    return TestClient(app)

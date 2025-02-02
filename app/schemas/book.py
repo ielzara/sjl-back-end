@@ -71,4 +71,4 @@ class BookDB(BookBase, BaseDBSchema):
     '''
     Schema for reading a book from the database (response model)
     '''
-    pass
+    relevance_explanation: Optional[str] = None

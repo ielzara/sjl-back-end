@@ -2,17 +2,19 @@ from typing import Optional, List
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy import select, text
+from sqlalchemy.orm import selectinload, contains_eager
 
 from app.crud.article import article_crud
 from app.schemas.article import ArticleCreate, ArticleUpdate, ArticleDB
 from app.schemas.base import PaginatedResponse
 from app.schemas.book import BookDB
+from app.schemas.topic import TopicDB
+from app.models.article import Article
+from app.models.book import Book
+from app.models.associations import article_books
 from app.core.database import get_db
 import logging
-
-from app.schemas.topic import TopicDB
 
 logger = logging.getLogger(__name__)
 
@@ -69,26 +71,42 @@ async def get_article(article_id: int, db: AsyncSession = Depends(get_db)) -> Ar
         raise HTTPException(status_code=404, detail="Article not found")
     return article
 
-from app.models.article import Article
-
 @router.get("/{article_id}/books", response_model=List[BookDB])
 async def get_article_books(
     article_id: int,
     db: AsyncSession = Depends(get_db)
 ) -> List[BookDB]:
     '''Get all books linked to a specific article'''
-    result = await db.execute(
-        select(Article)
-        .options(selectinload(Article.books))
-        .where(Article.id == article_id)
+    # Query that includes the relevance explanation from the join table
+    query = (
+        select(Book)
+        .join(article_books)
+        .where(article_books.c.article_id == article_id)
+        .options(
+            # Add the relevance explanation to the book objects
+            selectinload(Book.articles).options(
+                selectinload(Article.books.and_(article_books.c.article_id == article_id))
+            )
+        )
     )
-    article = result.scalar_one_or_none()
     
-    if article is None:
-        raise HTTPException(status_code=404, detail="Article not found")
+    result = await db.execute(query)
+    books = result.scalars().unique().all()
     
-    logger.info(f"Found {len(article.books)} books for article {article_id}")
-    return article.books
+    if not books:
+        raise HTTPException(status_code=404, detail="Article not found or has no books")
+    
+    # Add relevance explanations to the books
+    for book in books:
+        rel_query = select(article_books.c.relevance_explanation).where(
+            (article_books.c.article_id == article_id) & 
+            (article_books.c.book_id == book.id)
+        )
+        rel_result = await db.execute(rel_query)
+        book.relevance_explanation = rel_result.scalar_one_or_none()
+    
+    logger.info(f"Found {len(books)} books with explanations for article {article_id}")
+    return books
 
 @router.get("/{article_id}/topics", response_model=List[TopicDB])
 async def get_article_topics(

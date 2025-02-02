@@ -17,4 +17,4 @@ class Article(Base):
     featured: Mapped[bool] = mapped_column(Boolean, default=False)
 
     topics = relationship("Topic", secondary="article_topics", back_populates="articles", lazy="selectin")
-    books = relationship("Book", secondary="article_books", back_populates="articles")
+    books = relationship("Book", secondary="article_books", back_populates="articles", lazy="selectin")

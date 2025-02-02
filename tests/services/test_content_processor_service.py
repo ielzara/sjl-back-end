@@ -1,3 +1,4 @@
+
 import pytest
 from datetime import datetime, date
 from unittest.mock import Mock, AsyncMock
@@ -72,16 +73,16 @@ def mock_books():
     return mock
 
 @pytest.fixture
-async def processor(mock_guardian, mock_anthropic, mock_books, db_session):
+async def processor(mock_guardian, mock_anthropic, mock_books, db):
     return ContentProcessor(
-        db=db_session,
+        db=db,
         guardian_service=mock_guardian,
         anthropic_service=mock_anthropic,
         books_service=mock_books
     )
 
 @pytest.mark.asyncio
-async def test_process_new_content_success(processor, db_session):
+async def test_process_new_content_success(processor, db):
     """Test successful processing of new content"""
     await processor.process_new_content()
     
@@ -96,7 +97,7 @@ async def test_process_new_content_success(processor, db_session):
     processor.anthropic_service.batch_analyze_book_relevance.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_skip_existing_article(processor, db_session, sample_article_data):
+async def test_skip_existing_article(processor, db, article_data):
     """Test that existing articles are skipped"""
     # Process same content twice
     await processor.process_new_content()

@@ -16,7 +16,7 @@ EXCLUDED_TERMS = {
 
 SUBJECT_FILTERS = [
     'Social Science', 'Political Science', 'History', 'Law', 'Education',
-    'Philosophy', 'Sociology', 'Psychology', 'Social Justice'
+    'Philosophy', 'Sociology', 'Psychology', 'Social Justice', 'Medical', 'Art'
 ]
 
 class GoogleBooksService:
@@ -65,8 +65,8 @@ class GoogleBooksService:
 
                 async with httpx.AsyncClient() as client:
                     response = await client.get(self.base_url, params=params)
-                    response.raise_for_status()
-                    data = response.json()
+                    await response.aclose()  # Ensure connection is closed
+                    data = response.json()  # This is now synchronous as response.json() returns the parsed data directly
 
                     total_items = data.get("totalItems", 0)
                     items = data.get("items", [])

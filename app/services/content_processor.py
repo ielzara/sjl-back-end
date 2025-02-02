@@ -79,7 +79,7 @@ class ContentProcessor:
                 # Batch analyze all books for relevance
                 relevant_books = await self.anthropic_service.batch_analyze_book_relevance(
                     article_analysis=analysis,
-                    books=[book.dict() for book in all_books],
+                    books=[book.model_dump() for book in all_books],
                     min_relevance_score=0.8
                 )
 
