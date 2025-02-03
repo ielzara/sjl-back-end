@@ -1,9 +1,10 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
-from sqlalchemy.orm import selectinload, contains_eager
+from sqlalchemy.orm import selectinload, joinedload, aliased
+from sqlalchemy.sql import text as sql_text
 
 from app.crud.article import article_crud
 from app.schemas.article import ArticleCreate, ArticleUpdate, ArticleDB
@@ -76,37 +77,49 @@ async def get_article_books(
     article_id: int,
     db: AsyncSession = Depends(get_db)
 ) -> List[BookDB]:
-    '''Get all books linked to a specific article'''
-    # Query that includes the relevance explanation from the join table
-    query = (
-        select(Book)
-        .join(article_books)
-        .where(article_books.c.article_id == article_id)
-        .options(
-            # Add the relevance explanation to the book objects
-            selectinload(Book.articles).options(
-                selectinload(Article.books.and_(article_books.c.article_id == article_id))
-            )
+    '''Get all books linked to a specific article with their relevance explanations'''
+    try:
+        # Get associations first
+        assoc_query = await db.execute(
+            select(article_books).where(article_books.c.article_id == article_id)
         )
-    )
-    
-    result = await db.execute(query)
-    books = result.scalars().unique().all()
-    
-    if not books:
-        raise HTTPException(status_code=404, detail="Article not found or has no books")
-    
-    # Add relevance explanations to the books
-    for book in books:
-        rel_query = select(article_books.c.relevance_explanation).where(
-            (article_books.c.article_id == article_id) & 
-            (article_books.c.book_id == book.id)
+        associations = {
+            row.book_id: row.relevance_explanation 
+            for row in assoc_query.fetchall()
+        }
+        
+        if not associations:
+            raise HTTPException(status_code=404, detail="Article not found or has no books")
+            
+        # Get books
+        books_query = await db.execute(
+            select(Book)
+            .where(Book.id.in_(associations.keys()))
         )
-        rel_result = await db.execute(rel_query)
-        book.relevance_explanation = rel_result.scalar_one_or_none()
-    
-    logger.info(f"Found {len(books)} books with explanations for article {article_id}")
-    return books
+        books = books_query.scalars().all()
+        
+        # Create response with relevance explanations
+        response_books = []
+        for book in books:
+            book_dict = {
+                "id": book.id,
+                "title": book.title,
+                "author": book.author,
+                "description": book.description,
+                "url": book.url,
+                "cover_url": book.cover_url,
+                "isbn": book.isbn,
+                "relevance_explanation": associations[book.id]
+            }
+            response_books.append(BookDB(**book_dict))
+        
+        return response_books
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting article books: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{article_id}/topics", response_model=List[TopicDB])
 async def get_article_topics(
