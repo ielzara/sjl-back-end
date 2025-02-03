@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Text
 from typing import List
 from app.core.database import Base
 
@@ -14,5 +15,16 @@ class Book(Base):
     isbn: Mapped[str] = mapped_column(unique=True)
 
     # Relationships
-    topics: Mapped[List["Topic"]] = relationship(secondary="book_topics", back_populates="books", lazy="selectin")
-    articles: Mapped[List["Article"]] = relationship(secondary="article_books", back_populates="books", lazy="selectin")
+    topics: Mapped[List["Topic"]] = relationship(
+        secondary="book_topics", 
+        back_populates="books", 
+        lazy="selectin"
+    )
+    
+    # Update the relationship to include the relevance_explanation
+    articles: Mapped[List["Article"]] = relationship(
+        secondary="article_books",
+        back_populates="books",
+        lazy="selectin",
+        overlaps="books"  # Handle potential overlap warnings
+    )

@@ -1,3 +1,25 @@
+"""
+Content Processor Service
+
+This module handles the core content processing workflow for the Social Justice Library.
+It coordinates between different services to:
+1. Fetch new articles from Guardian News
+2. Analyze articles for social justice relevance
+3. Extract topics and keywords
+4. Find and analyze relevant books
+5. Store everything in the database with proper relationships
+
+The processing follows these steps:
+1. Get recent articles (last 24 hours)
+2. For each article:
+   - Check if it's already processed
+   - Analyze for social justice relevance
+   - Extract and create topics
+   - Generate book search keywords
+   - Find relevant books
+   - Create relationships between articles, books, and topics
+"""
+
 from datetime import datetime, timedelta, UTC
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +36,23 @@ from app.schemas.book import BookCreate
 logger = logging.getLogger(__name__)
 
 class ContentProcessor:
+    """
+    Main service for processing news articles and finding relevant books.
+    
+    This service orchestrates the entire content processing workflow:
+    - Fetches new articles from Guardian News API
+    - Uses Claude AI to analyze articles for social justice relevance
+    - Extracts topics and generates book search keywords
+    - Searches for relevant books using Google Books API
+    - Creates and maintains relationships between content in the database
+    
+    Attributes:
+        db (AsyncSession): Database session for storing processed content
+        guardian_service (GuardianNewsService): Service for fetching news articles
+        anthropic_service (AnthropicService): Service for AI analysis
+        books_service (GoogleBooksService): Service for finding books
+    """
+
     def __init__(
         self,
         db: AsyncSession,
@@ -27,7 +66,31 @@ class ContentProcessor:
         self.books_service = books_service
 
     async def process_new_content(self) -> None:
-        """Main function to process new articles and find related books"""
+        """
+        Main function to process new articles and find related books.
+        
+        This function:
+        1. Fetches yesterday's articles from Guardian News
+        2. For each new article:
+           - Analyzes it for social justice relevance
+           - Creates topics based on analysis
+           - Finds relevant books
+           - Creates database relationships
+        
+        The function uses a minimum relevance score of 0.8 for both
+        articles and books to ensure high-quality connections.
+        
+        Error Handling:
+        - Skips articles that already exist in database
+        - Skips articles with low relevance scores
+        - Continues processing if one article fails
+        - Logs all major steps and errors
+        
+        Database Operations:
+        - Creates new articles, books, and topics
+        - Creates relationships between them
+        - Stores relevance explanations
+        """
         # Get yesterday's articles
         from_date = datetime.now(UTC) - timedelta(days=1)
         articles, _ = await self.guardian_service.get_recent_social_justice_articles(from_date=from_date)

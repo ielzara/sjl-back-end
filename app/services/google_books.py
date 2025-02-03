@@ -16,7 +16,7 @@ EXCLUDED_TERMS = {
 
 SUBJECT_FILTERS = [
     'Social Science', 'Political Science', 'History', 'Law', 'Education',
-    'Philosophy', 'Sociology', 'Psychology', 'Social Justice', 'Medical', 'Art'
+    'Philosophy', 'Sociology', 'Psychology', 'Social Justice', 'Medical', 'Art', 'Business & Economics'
 ]
 
 class GoogleBooksService:
@@ -81,12 +81,12 @@ class GoogleBooksService:
                             logger.info(f"Skipping technical/reference book: {title}")
                             continue
                             
-                        # Check if book has relevant subjects
-                        subjects = volume_info.get("categories", [])
-                        if not any(any(subject.lower() in category.lower() for subject in SUBJECT_FILTERS) 
-                                 for category in subjects):
-                            logger.info(f"Skipping book with non-relevant subjects: {title} - {subjects}")
-                            continue
+                        # # Check if book has relevant subjects
+                        # subjects = volume_info.get("categories", [])
+                        # if not any(any(subject.lower() in category.lower() for subject in SUBJECT_FILTERS) 
+                        #          for category in subjects):
+                        #     logger.info(f"Skipping book with non-relevant subjects: {title} - {subjects}")
+                        #     continue
 
                         # Get publication date and skip if too old
                         published_date = volume_info.get("publishedDate", "")
@@ -118,8 +118,7 @@ class GoogleBooksService:
                         try:
                             # Truncate description if needed
                             description = volume_info.get("description", "No description available")
-                            if len(description) > 500:
-                                description = description[:497] + "..."
+        
 
                             book = BookCreate(
                                 title=title,

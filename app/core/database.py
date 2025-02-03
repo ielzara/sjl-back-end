@@ -6,7 +6,7 @@ class Base(DeclarativeBase):
     """Base class for all database models"""
     pass
 
-# Create database engine with minimal configuration
+# Create database engine
 engine = create_async_engine(settings.DATABASE_URL)
 
 # Create session factory with async support

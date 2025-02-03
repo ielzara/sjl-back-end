@@ -23,6 +23,11 @@ class GuardianNewsService:
         ")"
     )
     
+    # Titles to exclude
+    EXCLUDED_TITLES = [
+        "Morning Mail",
+    ]
+    
     def __init__(self):
         self.base_url = settings.GUARDIAN_BASE_URL
         self.api_key = settings.GUARDIAN_API_KEY
@@ -58,12 +63,17 @@ class GuardianNewsService:
             response_data = await self._make_request('search', params)
             guardian_response = response_data['response']
             
-            articles = [
-                self._parse_article_data(article_data) 
-                for article_data in guardian_response['results']
-            ]
+            articles = []
+            for article_data in guardian_response['results']:
+                try:
+                    article = self._parse_article_data(article_data)
+                    if article:  # Only add if article wasn't filtered out
+                        articles.append(article)
+                except Exception as e:
+                    logger.warning(f"Skipping article due to parsing error: {str(e)}")
+                    continue
             
-            logger.info(f"Found {len(articles)} articles, total: {guardian_response['total']}")
+            logger.info(f"Found {len(articles)} valid articles out of {guardian_response['total']} total")
             return articles, guardian_response['total']
         
         except Exception as e:
@@ -91,14 +101,24 @@ class GuardianNewsService:
             logger.error(f"API request error: {str(e)}")
             raise
 
-    def _parse_article_data(self, article_data: Dict[str, Any]) -> ArticleCreate:
-        """Parse raw Guardian API data into ArticleCreate model"""
+    def _parse_article_data(self, article_data: Dict[str, Any]) -> Optional[ArticleCreate]:
+        """
+        Parse raw Guardian API data into ArticleCreate model.
+        Returns None for articles that should be excluded.
+        """
         try:
+            title = article_data['webTitle']
+            
+            # Skip articles with excluded titles
+            if any(title.startswith(excluded) for excluded in self.EXCLUDED_TITLES):
+                logger.info(f"Skipping excluded article: {title}")
+                return None
+                
             fields = article_data.get('fields', {})
             content = fields.get('bodyText') or fields.get('body', '')
             
             return ArticleCreate(
-                title=article_data['webTitle'],
+                title=title,
                 date=datetime.fromisoformat(article_data['webPublicationDate'].replace('Z', '+00:00')).date(),
                 content=content,
                 source="The Guardian",
