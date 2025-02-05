@@ -54,19 +54,19 @@ class GoogleBooksService:
 
                 params = {
                     "q": clean_term,
-                    "maxResults": 20,  # Increased to get more candidates for analysis
+                    "maxResults": 20,  # Max results per query
                     "printType": "books",
                     "langRestrict": "en",
                     "orderBy": "relevance",
                     "key": self.api_key
                 }
                 
-                logger.info(f"Making request with params (excluding key)")
+                logger.info("Making request with params (excluding key)")
 
                 async with httpx.AsyncClient() as client:
                     response = await client.get(self.base_url, params=params)
                     await response.aclose()  # Ensure connection is closed
-                    data = response.json()  # This is now synchronous as response.json() returns the parsed data directly
+                    data = response.json() # Parse JSON response
 
                     total_items = data.get("totalItems", 0)
                     items = data.get("items", [])

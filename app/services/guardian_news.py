@@ -84,7 +84,9 @@ class GuardianNewsService:
         """Make an HTTP request to the Guardian API"""
         params['api-key'] = self.api_key
         if 'show-fields' not in params:
-            params['show-fields'] = 'body,bodyText,headline,trailText,sectionName'
+            params['show-fields'] = 'body,bodyText,headline,trailText,sectionName,thumbnail'
+        if 'show-elements' not in params:
+            params['show-elements'] = 'image'
         
         params['tag'] = '-type/obituaries,-type/letters'
             
@@ -116,6 +118,46 @@ class GuardianNewsService:
                 
             fields = article_data.get('fields', {})
             content = fields.get('bodyText') or fields.get('body', '')
+
+            # Parse image data
+            main_image_url = None
+            main_image_alt = None
+            main_image_caption = None
+            main_image_credit = None
+            thumbnail_url = None
+
+            # Process elements for images
+            for element in article_data.get('elements', []):
+                if element.get('type') == 'image':
+                    assets = element.get('assets', [])
+                    if not assets:
+                        continue
+
+                    if element.get('relation') == 'main':
+                        # Get highest resolution image (usually 1000px)
+                        main_asset = max(
+                            assets, 
+                            key=lambda x: int(x.get('typeData', {}).get('width', 0) or 0)
+                        )
+                        type_data = main_asset.get('typeData', {})
+                        
+                        main_image_url = main_asset.get('file')
+                        main_image_alt = type_data.get('altText')
+                        main_image_caption = type_data.get('caption')
+                        main_image_credit = type_data.get('credit')
+                    
+                    elif element.get('relation') == 'thumbnail':
+                        # Get medium resolution for thumbnail (usually 500px)
+                        thumb_asset = next(
+                            (a for a in assets 
+                                if int(a.get('typeData', {}).get('width', 0) or 0) == 500),
+                            assets[0]
+                        )
+                        thumbnail_url = thumb_asset.get('file')
+
+            # If no separate thumbnail found, use thumbnail from fields
+            if not thumbnail_url and fields.get('thumbnail'):
+                thumbnail_url = fields.get('thumbnail')
             
             return ArticleCreate(
                 title=title,
@@ -123,7 +165,12 @@ class GuardianNewsService:
                 content=content,
                 source="The Guardian",
                 url=str(article_data['webUrl']),
-                featured=False
+                featured=False,
+                main_image_url=main_image_url,
+                main_image_alt=main_image_alt,
+                main_image_caption=main_image_caption,
+                main_image_credit=main_image_credit,
+                thumbnail_url=thumbnail_url
             )
         except Exception as e:
             logger.error(f"Error parsing article data: {str(e)}")

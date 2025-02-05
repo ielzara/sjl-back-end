@@ -77,7 +77,7 @@ class ContentProcessor:
            - Finds relevant books
            - Creates database relationships
         
-        The function uses a minimum relevance score of 0.8 for both
+        The function uses a minimum relevance score of 0.9 for both
         articles and books to ensure high-quality connections.
         
         Error Handling:
@@ -111,7 +111,7 @@ class ContentProcessor:
                     article_title=article.title
                 )
 
-                if analysis.relevance_score < 0.8:
+                if analysis.relevance_score < 0.9:
                     logger.info(f"Article not relevant enough, skipping: {article.title}")
                     continue
 
@@ -143,7 +143,7 @@ class ContentProcessor:
                 relevant_books = await self.anthropic_service.batch_analyze_book_relevance(
                     article_analysis=analysis,
                     books=[book.model_dump() for book in all_books],
-                    min_relevance_score=0.8
+                    min_relevance_score=0.9
                 )
 
                 # Process only the already filtered relevant books (max 5 from anthropic service)

@@ -13,6 +13,11 @@ class ArticleBase(BaseSchema):
     url: HttpUrl
     featured: bool = False
     date: date
+    main_image_url: Optional[HttpUrl] = None
+    main_image_alt: Optional[str] = None
+    main_image_caption: Optional[str] = None
+    main_image_credit: Optional[str] = None
+    thumbnail_url: Optional[HttpUrl] = None
 
     @field_validator('title', 'content', 'source')
     def validate_non_empty_string(cls, v: str) -> str:
