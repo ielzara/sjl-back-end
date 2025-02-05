@@ -117,7 +117,7 @@ class GuardianNewsService:
                 return None
                 
             fields = article_data.get('fields', {})
-            content = fields.get('bodyText') or fields.get('body', '')
+            content = fields.get('body') or fields.get('bodyText', '')
 
             # Parse image data
             main_image_url = None

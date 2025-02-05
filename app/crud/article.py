@@ -288,5 +288,15 @@ class CRUDArticle(CRUDBase[Article, ArticleCreate, ArticleUpdate]):
 
         return articles
 
+    async def get_most_recent_timestamp(self, db: AsyncSession) -> datetime | None:
+        """Get the timestamp of the most recently added article."""
+        result = await db.execute(
+            select(self.model.date)
+            .order_by(self.model.date.desc())
+            .limit(1)
+        )
+        timestamp = result.scalar_one_or_none()
+        return timestamp
+
 
 article_crud = CRUDArticle(Article)

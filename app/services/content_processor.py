@@ -91,10 +91,17 @@ class ContentProcessor:
         - Creates relationships between them
         - Stores relevance explanations
         """
-        # Get yesterday's articles
-        from_date = datetime.now(UTC) - timedelta(days=1)
+        # Get the timestamp of the most recent article
+        last_article_time = await article_crud.get_most_recent_timestamp(self.db)
+        
+        # If no articles exist, default to 24 hours ago
+        if last_article_time is None:
+            from_date = datetime.now(UTC) - timedelta(days=1)
+        else:
+            from_date = last_article_time
+
         articles, _ = await self.guardian_service.get_recent_social_justice_articles(from_date=from_date)
-        logger.info(f"Found {len(articles)} articles")
+        logger.info(f"Found {len(articles)} articles since {from_date}")
 
         for article in articles:
             try:

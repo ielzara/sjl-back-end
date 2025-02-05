@@ -181,7 +181,7 @@ Provide a JSON response with:
         self,
         article_analysis: ArticleAnalysis,
         books: List[Dict[str, str]],
-        min_relevance_score: float = 0.8
+        min_relevance_score: float = 0.9
     ) -> List[tuple[Dict[str, str], BookRelevance]]:
         """
         Analyze multiple books for relevance in a single API call.
@@ -195,18 +195,18 @@ Provide a JSON response with:
 Books to analyze:
 {book_list}
 
-Rate each book's relevance to the article topics. Return ONLY a JSON array where each object has book_title (string), relevance_score (float 0.0-1.0), and explanation (string, 2-3 sentences). Example format:
+Rate each book's relevance to the article topics. Return ONLY a JSON array where each object has book_title (string), relevance_score (float 0.0-1.0), and explanation (string, 3-4 sentences). Example format (explanation doesn't have to start exactly like shown):
 [
     {{
         "book_title": "Example Book",
         "relevance_score": 0.9,
-        "explanation": "This book directly addresses the topic."
+        "explanation": "This book directly addresses the topics in the article and provides valuable insights into the issues..." 
     }}
 ]""".format(
             topics=article_analysis.topics,
             book_list=json.dumps([{
                 'title': book.get('title'),
-                'description': book.get('description', '')[:200]
+                'description': book.get('description', '')[:400]
             } for book in books], indent=2)
         )
 

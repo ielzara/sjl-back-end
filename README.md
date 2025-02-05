@@ -152,4 +152,3 @@ alembic upgrade head
 4. Submit a pull request with description
 
 ## License
-[Your License]
