@@ -99,26 +99,39 @@ class GoogleBooksService:
                             except (ValueError, IndexError):
                                 pass
 
+                        # Skip books without covers
+                        if not volume_info.get("imageLinks", {}).get("thumbnail"):
+                            logger.info(f"Skipping book without cover: {title}")
+                            continue
+
                         # Get ISBN
                         isbn = None
                         for identifier in volume_info.get("industryIdentifiers", []):
                             if identifier.get("type") in ["ISBN_10", "ISBN_13"]:
                                 isbn = identifier.get("identifier")
-                                if len(isbn) == 10:  # Convert ISBN-10 to ISBN-13
-                                    isbn = "978" + isbn[:-1]
-                                # Pad ISBN if needed
-                                if len(isbn) == 11:
-                                    isbn = isbn + "00"
                                 break
+                                
 
-                        if not isbn or len(isbn) not in [10, 13]:
-                            logger.info(f"Skipping book with invalid ISBN: {title}")
-                            continue
+                        # Create a unique identifier based on multiple factors
+                        unique_id = None
+                        if isbn:
+                            unique_id = isbn
+                            logger.info(f"Using ISBN as unique identifier for '{title}'")
+                        else:
+                            # Use Google Books info_link as unique identifier
+                            info_link = volume_info.get("infoLink", "")
+                            if info_link:
+                                unique_id = info_link.split('?')[0]  # Remove query parameters
+                                logger.info(f"Using Google Books link as unique identifier for '{title}'")
+                            else:
+                                # Fallback: combine title and author
+                                authors = ", ".join(volume_info.get("authors", ["Unknown Author"]))
+                                unique_id = f"{title}|{authors}"
+                                logger.info(f"Using title+author as unique identifier for '{title}' by {authors}")
 
                         try:
                             # Truncate description if needed
                             description = volume_info.get("description", "No description available")
-        
 
                             book = BookCreate(
                                 title=title,
@@ -126,19 +139,21 @@ class GoogleBooksService:
                                 description=description,
                                 url=volume_info.get("infoLink", ""),
                                 cover_url=volume_info.get("imageLinks", {}).get("thumbnail", ""),
-                                isbn=isbn
+                                isbn=isbn or "",
+                                unique_id=unique_id
                             )
                             
-                            if not any(existing.isbn == book.isbn for existing in all_books):
+                            if not any(existing.unique_id == book.unique_id for existing in all_books):
                                 all_books.append(book)
                                 logger.info(f"Added book: {book.title}")
+                            else:
+                                logger.info(f"Skipping duplicate book: {book.title} (duplicate unique_id: {unique_id})")
 
                         except Exception as e:
                             logger.error(f"Error creating book {title}: {str(e)}")
                             continue
 
             logger.info(f"Total books found: {len(all_books)}")
-            # Don't slice here - return all books for further analysis
             return all_books
 
         except Exception as e:

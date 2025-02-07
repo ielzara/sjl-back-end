@@ -109,6 +109,7 @@ async def get_article_books(
                 "url": book.url,
                 "cover_url": book.cover_url,
                 "isbn": book.isbn,
+                "unique_id": book.unique_id,
                 "relevance_explanation": associations[book.id]
             }
             response_books.append(BookDB(**book_dict))

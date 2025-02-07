@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 from typing import Optional, List
 from pydantic import HttpUrl, field_validator, constr
 
@@ -12,7 +12,7 @@ class ArticleBase(BaseSchema):
     source: constr(min_length=1, strip_whitespace=True)
     url: HttpUrl
     featured: bool = False
-    date: date
+    date: datetime
     main_image_url: Optional[HttpUrl] = None
     main_image_alt: Optional[str] = None
     main_image_caption: Optional[str] = None
@@ -37,7 +37,7 @@ class ArticleUpdate(ArticleBase):
     source: Optional[constr(min_length=1, strip_whitespace=True)] = None
     url: Optional[HttpUrl] = None
     featured: Optional[bool] = None
-    date: Optional[date] = None 
+    date: Optional[datetime] = None 
 
 class ArticleResponse(ArticleBase, BaseDBSchema):
     """Schema for article responses without relationships"""

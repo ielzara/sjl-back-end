@@ -10,7 +10,7 @@ class Article(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     title: Mapped[str] = mapped_column(String, index=True)
-    date: Mapped[datetime] = mapped_column(DateTime)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     content: Mapped[str] = mapped_column(Text)
     source: Mapped[str] = mapped_column(String, index=True)
     url: Mapped[str] = mapped_column(String, unique=True, index=True)

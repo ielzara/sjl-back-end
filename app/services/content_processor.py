@@ -77,7 +77,7 @@ class ContentProcessor:
            - Finds relevant books
            - Creates database relationships
         
-        The function uses a minimum relevance score of 0.9 for both
+        The function uses a minimum relevance score of 0.85 for both
         articles and books to ensure high-quality connections.
         
         Error Handling:
@@ -94,88 +94,105 @@ class ContentProcessor:
         # Get the timestamp of the most recent article
         last_article_time = await article_crud.get_most_recent_timestamp(self.db)
         
-        # If no articles exist, default to 24 hours ago
+        # If no articles exist, default to 5 days ago
         if last_article_time is None:
-            from_date = datetime.now(UTC) - timedelta(days=1)
+            from_date = datetime.now(UTC) - timedelta(days=5)
         else:
             from_date = last_article_time
 
-        articles, _ = await self.guardian_service.get_recent_social_justice_articles(from_date=from_date)
-        logger.info(f"Found {len(articles)} articles since {from_date}")
+        page = 1
+        page_size = 50  # Increased from default 10
 
-        for article in articles:
-            try:
-                # Skip if already exists
-                existing_article = await article_crud.get_by_url(self.db, url=str(article.url))
-                if existing_article:
-                    logger.info(f"Article already exists: {article.title}")
+        while True:
+            articles, total = await self.guardian_service.get_recent_social_justice_articles(
+                from_date=from_date,
+                page=page,
+                page_size=page_size
+            )
+            
+            if not articles:
+                break
+
+            logger.info(f"Processing page {page}, articles found: {len(articles)}")
+
+            for article in articles:
+                try:
+                    # Skip if already exists
+                    existing_article = await article_crud.get_by_url(self.db, url=str(article.url))
+                    if existing_article:
+                        logger.info(f"Article already exists: {article.title}")
+                        continue
+
+                    # Analyze article
+                    logger.info(f"Analyzing article: {article.title}")
+                    analysis = await self.anthropic_service.analyze_article(
+                        article_text=article.content,
+                        article_title=article.title
+                    )
+
+                    if analysis.relevance_score < 0.85:
+                        logger.info(f"Article not relevant enough, skipping: {article.title}")
+                        continue
+
+                    # Create article
+                    db_article = await article_crud.create(self.db, obj_in=article)
+                    logger.info(f"Created article: {db_article.title}")
+
+                    # Process topics
+                    for topic_name in analysis.topics:
+                        topic = await topic_crud.get_by_name(self.db, name=topic_name)
+                        if not topic:
+                            topic = await topic_crud.create(self.db, obj_in=TopicCreate(name=topic_name))
+                        await article_crud.add_topic(self.db, db_article.id, topic.id)
+                        logger.info(f"Added topic to article: {topic_name}")
+
+                    # Get book recommendations
+                    search_terms = await self.anthropic_service.generate_book_keywords(analysis)
+                    if isinstance(search_terms, dict) and 'search_terms' in search_terms:
+                        search_terms = search_terms['search_terms'][:5]
+
+                    # Collect all potential books first
+                    all_books = []
+                    for term in search_terms:
+                        enhanced_term = f'"{term}" social justice'
+                        books = await self.books_service.search_books(enhanced_term)
+                        all_books.extend(books)
+
+                    # Batch analyze all books for relevance
+                    relevant_books = await self.anthropic_service.batch_analyze_book_relevance(
+                        article_analysis=analysis,
+                        books=[book.model_dump() for book in all_books],
+                        min_relevance_score=0.85
+                    )
+
+                    # Process only the already filtered relevant books (max 5 from anthropic service)
+                    for book_info, relevance in relevant_books:
+                        book = BookCreate(**book_info)
+                        # Get or create book
+                        db_book = await book_crud.get_by_isbn(self.db, isbn=book.isbn)
+                        if not db_book:
+                            db_book = await book_crud.create(self.db, obj_in=book)
+                            logger.info(f"Created book: {db_book.title}")
+
+                            # Add book topics
+                            for topic in db_article.topics:
+                                await book_crud.add_topic(self.db, db_book.id, topic.id)
+
+                        # Link book to article with explanation
+                        if not await article_crud.has_book(self.db, db_article.id, db_book.id):
+                            await article_crud.add_book(
+                                self.db,
+                                article_id=db_article.id,
+                                book_id=db_book.id,
+                                relevance_explanation=relevance.explanation
+                            )
+                            logger.info(f"Linked book to article: {db_book.title} ({relevance.relevance_score})")
+
+                except Exception as e:
+                    logger.error(f"Error processing article {article.title}: {str(e)}")
                     continue
 
-                # Analyze article
-                logger.info(f"Analyzing article: {article.title}")
-                analysis = await self.anthropic_service.analyze_article(
-                    article_text=article.content,
-                    article_title=article.title
-                )
-
-                if analysis.relevance_score < 0.9:
-                    logger.info(f"Article not relevant enough, skipping: {article.title}")
-                    continue
-
-                # Create article
-                db_article = await article_crud.create(self.db, obj_in=article)
-                logger.info(f"Created article: {db_article.title}")
-
-                # Process topics
-                for topic_name in analysis.topics:
-                    topic = await topic_crud.get_by_name(self.db, name=topic_name)
-                    if not topic:
-                        topic = await topic_crud.create(self.db, obj_in=TopicCreate(name=topic_name))
-                    await article_crud.add_topic(self.db, db_article.id, topic.id)
-                    logger.info(f"Added topic to article: {topic_name}")
-
-                # Get book recommendations
-                search_terms = await self.anthropic_service.generate_book_keywords(analysis)
-                if isinstance(search_terms, dict) and 'search_terms' in search_terms:
-                    search_terms = search_terms['search_terms'][:5]
-
-                # Collect all potential books first
-                all_books = []
-                for term in search_terms:
-                    enhanced_term = f'"{term}" social justice'
-                    books = await self.books_service.search_books(enhanced_term)
-                    all_books.extend(books)
-
-                # Batch analyze all books for relevance
-                relevant_books = await self.anthropic_service.batch_analyze_book_relevance(
-                    article_analysis=analysis,
-                    books=[book.model_dump() for book in all_books],
-                    min_relevance_score=0.9
-                )
-
-                # Process only the already filtered relevant books (max 5 from anthropic service)
-                for book_info, relevance in relevant_books:
-                    book = BookCreate(**book_info)
-                    # Get or create book
-                    db_book = await book_crud.get_by_isbn(self.db, isbn=book.isbn)
-                    if not db_book:
-                        db_book = await book_crud.create(self.db, obj_in=book)
-                        logger.info(f"Created book: {db_book.title}")
-
-                        # Add book topics
-                        for topic in db_article.topics:
-                            await book_crud.add_topic(self.db, db_book.id, topic.id)
-
-                    # Link book to article with explanation
-                    if not await article_crud.has_book(self.db, db_article.id, db_book.id):
-                        await article_crud.add_book(
-                            self.db,
-                            article_id=db_article.id,
-                            book_id=db_book.id,
-                            relevance_explanation=relevance.explanation
-                        )
-                        logger.info(f"Linked book to article: {db_book.title} ({relevance.relevance_score})")
-
-            except Exception as e:
-                logger.error(f"Error processing article {article.title}: {str(e)}")
-                continue
+            if len(articles) < page_size:
+                break
+            
+            page += 1

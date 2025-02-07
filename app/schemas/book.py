@@ -12,7 +12,8 @@ class BookBase(BaseSchema):
     description: constr(min_length=1, strip_whitespace=True)
     url: HttpUrl
     cover_url: HttpUrl
-    isbn: constr(min_length=10, max_length=13, strip_whitespace=True)
+    isbn: str
+    unique_id: str
 
     @field_validator('title', 'author', 'description')
     def validate_non_empty_string(cls, v: str) -> str:
@@ -21,34 +22,7 @@ class BookBase(BaseSchema):
             raise ValueError("String cannot be empty or contain only whitespace")
         return v
 
-    @field_validator('isbn')
-    def validate_isbn(cls, v: str) -> str:
-        """Validate ISBN format"""
-        # Remove any hyphens or spaces
-        isbn = ''.join(c for c in v if c.isdigit() or c.upper() == 'X')
-        
-        # Check if it's ISBN-10 or ISBN-13
-        if len(isbn) not in (10, 13):
-            raise ValueError("ISBN must be either 10 or 13 characters long")
-        
-        # For ISBN-10
-        if len(isbn) == 10:
-            # Check if first 9 characters are digits
-            if not isbn[:9].isdigit():
-                raise ValueError("First 9 characters of ISBN-10 must be digits")
-            # Check if last character is digit or 'X'
-            if not (isbn[9].isdigit() or isbn[9].upper() == 'X'):
-                raise ValueError("Last character of ISBN-10 must be digit or 'X'")
-        
-        # For ISBN-13
-        if len(isbn) == 13:
-            if not isbn.isdigit():
-                raise ValueError("ISBN-13 must contain only digits")
-            # Check if it starts with valid prefix (978 or 979)
-            if not isbn.startswith(('978', '979')):
-                raise ValueError("ISBN-13 must start with 978 or 979")
-        
-        return isbn
+
 
 class BookCreate(BookBase):
     '''
@@ -65,7 +39,8 @@ class BookUpdate(BaseSchema):
     description: Optional[constr(min_length=1, strip_whitespace=True)] = None
     url: Optional[HttpUrl] = None
     cover_url: Optional[HttpUrl] = None
-    isbn: Optional[constr(min_length=10, max_length=13, strip_whitespace=True)] = None
+    isbn: Optional[str] = None
+    unique_id: Optional[str] = None
 
 class BookDB(BookBase, BaseDBSchema):
     '''

@@ -12,7 +12,8 @@ class Book(Base):
     description: Mapped[str]
     url: Mapped[str]
     cover_url: Mapped[str]
-    isbn: Mapped[str] = mapped_column(unique=True)
+    isbn: Mapped[str]
+    unique_id: Mapped[str] = mapped_column(unique=True)
 
     # Relationships
     topics: Mapped[List["Topic"]] = relationship(

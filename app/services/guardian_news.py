@@ -25,7 +25,7 @@ class GuardianNewsService:
     
     # Titles to exclude
     EXCLUDED_TITLES = [
-        "Morning Mail",
+        "Morning Mail", "– live", "– as it happened",
     ]
     
     def __init__(self):
@@ -112,7 +112,7 @@ class GuardianNewsService:
             title = article_data['webTitle']
             
             # Skip articles with excluded titles
-            if any(title.startswith(excluded) for excluded in self.EXCLUDED_TITLES):
+            if any(excluded in title for excluded in self.EXCLUDED_TITLES):
                 logger.info(f"Skipping excluded article: {title}")
                 return None
                 
@@ -161,7 +161,7 @@ class GuardianNewsService:
             
             return ArticleCreate(
                 title=title,
-                date=datetime.fromisoformat(article_data['webPublicationDate'].replace('Z', '+00:00')).date(),
+                date=datetime.fromisoformat(article_data['webPublicationDate'].replace('Z', '+00:00')),
                 content=content,
                 source="The Guardian",
                 url=str(article_data['webUrl']),
