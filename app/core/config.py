@@ -20,6 +20,7 @@ class Settings:
         
         # Database Configuration
         self.DATABASE_URL = os.getenv("DATABASE_URL")
+        print(f"Database URL: {self.DATABASE_URL}")
         
         # CORS Configuration
         self.BACKEND_CORS_ORIGINS: List[str] = eval(os.getenv("BACKEND_CORS_ORIGINS", "[]"))
